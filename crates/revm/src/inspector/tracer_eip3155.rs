@@ -5,7 +5,7 @@ use crate::interpreter::{CallInputs, CreateInputs, Gas, InstructionResult};
 use crate::primitives::{db::Database, hex, Bytes, B160};
 use crate::{evm_impl::EVMData, Inspector};
 use revm_interpreter::primitives::U256;
-use revm_interpreter::{opcode, Interpreter, Memory, Stack};
+use revm_interpreter::{opcode, Interpreter, Stack};
 use serde_json::json;
 use std::io::Write;
 
@@ -13,7 +13,6 @@ pub struct TracerEip3155 {
     output: Box<dyn Write>,
     gas_inspector: GasInspector,
 
-    #[allow(dead_code)]
     trace_mem: bool,
     #[allow(dead_code)]
     trace_return_data: bool,
@@ -24,7 +23,7 @@ pub struct TracerEip3155 {
     gas: u64,
     mem_size: usize,
     #[allow(dead_code)]
-    memory: Option<Memory>,
+    memory: Option<Vec<u8>>,
     skip: bool,
 }
 
@@ -65,7 +64,17 @@ impl<DB: Database> Inspector<DB> for TracerEip3155 {
         self.opcode = interp.current_opcode();
         self.mem_size = interp.memory.len();
         self.gas = self.gas_inspector.gas_remaining();
-        //
+        if self.trace_mem {
+            match &mut self.memory {
+                None => {
+                    self.memory = Some(interp.memory.data().clone());
+                }
+                Some(data) => {
+                    data.clear();
+                    data.extend_from_slice(interp.memory.data());
+                }
+            }
+        }
         InstructionResult::Continue
     }
 
@@ -154,12 +163,17 @@ impl<DB: Database> Inspector<DB> for TracerEip3155 {
 impl TracerEip3155 {
     fn print_log_line(&mut self, depth: u64) {
         let short_stack: Vec<String> = self.stack.data().iter().map(|&b| short_hex(b)).collect();
+        let memory = self
+            .memory
+            .as_ref()
+            .map(hex::encode)
+            .unwrap_or("".to_string());
         let log_line = json!({
             "pc": self.pc,
             "op": self.opcode,
             "gas": format!("0x{:x}", self.gas),
             "gasCost": format!("0x{:x}", self.gas_inspector.last_gas_cost()),
-            //memory?
+            "memory": memory,
             "memSize": self.mem_size,
             "stack": short_stack,
             "depth": depth,
