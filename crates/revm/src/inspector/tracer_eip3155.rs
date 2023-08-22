@@ -173,7 +173,7 @@ impl TracerEip3155 {
             "op": self.opcode,
             "gas": format!("0x{:x}", self.gas),
             "gasCost": format!("0x{:x}", self.gas_inspector.last_gas_cost()),
-            "memory": memory,
+            "memory": format!("0x{}", memory),
             "memSize": self.mem_size,
             "stack": short_stack,
             "depth": depth,
